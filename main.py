@@ -75,19 +75,17 @@ def fetch_metar_and_elevation(airport_code):
 
 # Calculate density altitude
 def calculate_density_altitude(elevation, temperature, altimeter):
-    # Convert temperature from Celsius to Kelvin
-    temperature_k = temperature + 273.15
-    
-    # Calculate standard temperature at given elevation
-    standard_temp_k = 288.15 - (0.0065 * elevation)
+    # Calculate standard temperature at given elevation in Celsius
+    standard_temp_c = 15 - (2 * (elevation / 1000))
 
     # Calculate pressure altitude
-    pressure_altitude = elevation + (1013.25 - altimeter) * 30
-    
+    pressure_altitude = elevation + (1013.25 - altimeter) * 30  # Adjust the factor as needed
+
     # Calculate density altitude
-    density_altitude = pressure_altitude + (120 * (temperature_k - standard_temp_k))
+    density_altitude = pressure_altitude + (120 * (temperature - standard_temp_c))
     
     return density_altitude
+
 
 # Parse METAR data into fields for InfluxDB
 def parse_metar_data(metar_data):

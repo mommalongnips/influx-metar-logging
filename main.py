@@ -145,8 +145,6 @@ while True:
     if metar_data_list:
         for metar_info in metar_data_list:
             parsed_data = parse_metar_data(metar_info)
-            print(parsed_data)
-            quit()
             influxdb_payload = prepare_influxdb_payload(parsed_data)
             send_to_influxdb(influxdb_payload)
     else:

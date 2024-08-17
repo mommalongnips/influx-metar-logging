@@ -31,7 +31,7 @@ INFLUXDB_PORT = os.getenv('INFLUXDB_PORT', '8086')
 INFLUXDB_BUCKET = os.getenv('INFLUXDB_BUCKET')
 INFLUXDB_ORG = os.getenv('INFLUXDB_ORG')
 AIRPORTS = os.getenv('AIRPORTS', 'KBJC,KFNL').split(',')
-INTERVAL = int(os.getenv('INTERVAL', '60'))
+INTERVAL = int(os.getenv('INTERVAL', '300'))
 
 # Check if all required environment variables are set
 if not CHECKWX_API_KEY:
@@ -60,29 +60,30 @@ if INTERVAL < 60:
 # InfluxDB URL with org and bucket variables
 INFLUXDB_URL = f'http://{INFLUXDB_HOST}:{INFLUXDB_PORT}/api/v2/write?org={INFLUXDB_ORG}&bucket={INFLUXDB_BUCKET}&precision=s'
 
-# Function to fetch METAR and elevation data from CheckWX API
-def fetch_metar_and_elevation(airport_code):
+# Function to fetch METAR data for multiple airports from CheckWX API
+def fetch_metar_data(airport_codes):
     headers = {
         'X-API-Key': CHECKWX_API_KEY
     }
-    response = requests.get(f'https://api.checkwx.com/metar/{airport_code}/decoded', headers=headers)
+    # Join the airport codes into a comma-separated string
+    airports_str = ",".join(airport_codes)
+    response = requests.get(f'https://api.checkwx.com/metar/{airports_str}/decoded', headers=headers)
     if response.status_code == 200:
         data = response.json()
         if data and data['data']:
-            metar_data = data['data'][0]
-            return metar_data
+            return data['data']
     return None
 
-# Calculate density altitude
-def calculate_density_altitude(elevation, temperature, altimeter):
-    # Calculate standard temperature at given elevation in Celsius
-    standard_temp_c = 15 - (2 * (elevation / 1000))
-
-    # Calculate pressure altitude
-    pressure_altitude = elevation + (1013.25 - altimeter) * 30  # Adjust the factor as needed
-
-    # Calculate density altitude
-    density_altitude = pressure_altitude + (120 * (temperature - standard_temp_c))
+def calculate_density_altitude(elevation_ft, temperature_c, altimeter_hpa):
+    # Convert altimeter setting to pressure altitude (assuming altimeter is set to 29.92 inHg)
+    altimeter_inHg = altimeter_hpa * 0.02953
+    pressure_altitude = (29.92 - altimeter_inHg) * 1000 + elevation_ft
+    
+    # Calculate ISA temperature at the given elevation (in °C)
+    isa_temperature = 15 - (2 * (elevation_ft / 1000))
+    
+    # Calculate Density Altitude using the FAA formula
+    density_altitude = pressure_altitude + (120 * (temperature_c - isa_temperature))
     
     return density_altitude
 
@@ -137,16 +138,16 @@ def send_to_influxdb(payload):
     else:
         print(f"Failed to send data to InfluxDB: {response.status_code}, {response.text}")
 
-# Main loop
+# Main processing
 while True:
-    for airport in AIRPORTS:
-        metar_info = fetch_metar_and_elevation(airport)
-        if metar_info:
+    metar_data_list = fetch_metar_data(AIRPORTS)
+    if metar_data_list:
+        for metar_info in metar_data_list:
             parsed_data = parse_metar_data(metar_info)
             influxdb_payload = prepare_influxdb_payload(parsed_data)
             send_to_influxdb(influxdb_payload)
-        else:
-            print(f"Could not fetch data for {airport}")
+    else:
+        print("Could not fetch data for the airports")
     
     print(f"Sleeping for {INTERVAL} seconds...")
     time.sleep(INTERVAL)

@@ -105,7 +105,7 @@ def parse_metar_data(metar_data):
         "wind_speed": metar_data['wind']['speed_kts'] if 'wind' in metar_data else None,
         "wind_gust": metar_data['wind']['gust_kts'] if 'wind' in metar_data and 'gust_kts' in metar_data['wind'] else None,
         "wind_direction": metar_data['wind']['degrees'] if 'wind' in metar_data else None,
-        "visibility": metar_data['visibility']['meters'] if 'visibility' in metar_data else None,
+        "visibility": metar_data['visibility']['miles_float'] if 'visibility' in metar_data else None,
         "altimeter": altimeter,
         "elevation": elevation,
         "density_altitude": density_altitude
@@ -141,9 +141,12 @@ def send_to_influxdb(payload):
 # Main processing
 while True:
     metar_data_list = fetch_metar_data(AIRPORTS)
+    print(metar_data_list)
     if metar_data_list:
         for metar_info in metar_data_list:
             parsed_data = parse_metar_data(metar_info)
+            print(parsed_data)
+            quit()
             influxdb_payload = prepare_influxdb_payload(parsed_data)
             send_to_influxdb(influxdb_payload)
     else:
